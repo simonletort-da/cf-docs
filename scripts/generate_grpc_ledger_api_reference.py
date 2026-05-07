@@ -477,7 +477,7 @@ def build_nav_group(
     ):
         package_ref = canton_protobuf_history.docs_json_page_ref(package_page, docs_json_path)
         refs.add(package_ref)
-        package_pages: list[Any] = [package_ref]
+        package_pages: list[Any] = []
         package_operation_dir = output_dir / package_page.stem
         service_groups: list[Any] = []
         if package_operation_dir.is_dir():
@@ -501,14 +501,31 @@ def build_nav_group(
                     }
                 )
         if service_groups:
-            package_pages.append({"group": "Services", "pages": service_groups})
+            package_pages.extend(service_groups)
+        package_pages.append(package_ref)
         package_groups.append({"group": mdx_title(package_page), "pages": package_pages})
 
     pages: list[Any] = []
-    if package_groups:
-        pages.append({"group": "Packages", "pages": package_groups})
+    pages.extend(package_groups)
     pages.append(details_ref)
     return {"group": GROUP_LABEL, "pages": pages}, refs
+
+
+def retitle_package_detail_pages(*, output_dir: Path, page_paths: list[Path]) -> None:
+    for package_page in sorted(
+        (path for path in page_paths if path.parent == output_dir),
+        key=lambda path: path.name,
+    ):
+        if package_page.name == "details.mdx":
+            continue
+        title = mdx_title(package_page)
+        replace_text(
+            package_page,
+            [
+                (f'title: "{title}"', f'title: "{DETAILS_LABEL}"'),
+                (f"<h1 class=\"x2mdx-ref-title\">{html_text(title)}</h1>", f"<h1 class=\"x2mdx-ref-title\">{DETAILS_LABEL}</h1>"),
+            ],
+        )
 
 
 def insert_group(items: list[Any], *, group: dict[str, Any], after_group: str | None) -> None:
@@ -687,6 +704,7 @@ def main() -> int:
         docs_json_path=Path(args.docs_json).resolve(),
         dropdown_label=args.nav_dropdown,
     )
+    retitle_package_detail_pages(output_dir=output_dir, page_paths=page_paths)
     print(f"Wrote {len(written_paths)} generated pages under {output_dir}")
     return 0
 
